@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     http_max_keepalive_connections: int = 20
     http_connect_timeout: float = 10.0
 
+    # CORS Settings
+    cors_origins: str = "http://localhost:3000,http://localhost:8080"
+
     class Config:
         env_file = ".env"
         case_sensitive = False

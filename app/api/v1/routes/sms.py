@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-import asyncio
 
 from app.schemas.sms_schema import SMSRequest, SMSResponse
 from app.services.sms.sms_service import sms_service, SMSServiceError

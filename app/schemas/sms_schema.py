@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional
 from datetime import datetime
-import re
+
+from app.utils.validators import PhoneValidator, validate_sms_text
 
 
 class SMSRequest(BaseModel):
@@ -9,48 +10,22 @@ class SMSRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=1600, description="SMS text content")
     from_number: Optional[str] = Field(None, min_length=10, max_length=20, description="Sender phone number")
 
-    @validator('to')
+    @field_validator('to')
+    @classmethod
     def validate_to_phone(cls, v):
-        # Phone number validation - supports international and local formats
-        # Allows: +98xxxxxxxxxx, 09xxxxxxxxx, 0098xxxxxxxxxx
-        clean_phone = re.sub(r'[\s\-\(\)]', '', v)
-        
-        # Patterns for different phone number formats
-        patterns = [
-            r'^\+98[0-9]{10}$',      # +98xxxxxxxxxx (Iran international)
-            r'^0098[0-9]{10}$',      # 0098xxxxxxxxxx (Iran international with 00)
-            r'^09[0-9]{9}$',         # 09xxxxxxxxx (Iran local)
-            r'^\+?[1-9]\d{1,14}$'    # General international format
-        ]
-        
-        if not any(re.match(pattern, clean_phone) for pattern in patterns):
-            raise ValueError('Invalid phone number format. Supported formats: +98xxxxxxxxxx, 09xxxxxxxxx, 0098xxxxxxxxxx')
-        return clean_phone
+        return PhoneValidator.validate_phone_number(v, "recipient phone number")
 
-    @validator('from_number')
+    @field_validator('from_number')
+    @classmethod
     def validate_from_phone(cls, v):
         if v is not None:
-            clean_phone = re.sub(r'[\s\-\(\)]', '', v)
-            
-            # Patterns for different phone number formats
-            patterns = [
-                r'^\+98[0-9]{10}$',      # +98xxxxxxxxxx (Iran international)
-                r'^0098[0-9]{10}$',      # 0098xxxxxxxxxx (Iran international with 00)
-                r'^09[0-9]{9}$',         # 09xxxxxxxxx (Iran local)
-                r'^5000[0-9]{10}$',     # 5000xxxxxxxxxx (Iran SMS sender)
-                r'^\+?[1-9]\d{1,14}$'    # General international format
-            ]
-            
-            if not any(re.match(pattern, clean_phone) for pattern in patterns):
-                raise ValueError('Invalid sender phone number format. Supported formats: +98xxxxxxxxxx, 09xxxxxxxxx, 5000xxxxxxxxxx')
-            return clean_phone
+            return PhoneValidator.validate_phone_number(v, "sender phone number")
         return v
 
-    @validator('text')
+    @field_validator('text')
+    @classmethod
     def validate_text(cls, v):
-        if not v or not v.strip():
-            raise ValueError('SMS text cannot be empty')
-        return v.strip()
+        return validate_sms_text(v)
 
     model_config = {
         "json_schema_extra": {
