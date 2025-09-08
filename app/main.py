@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.api.v1.routes.sms import router as sms_router
+from app.api.v1.routes.email import router as email_router
 from app.core.tasks import cleanup_logs_task
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -37,6 +38,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(sms_router)
+app.include_router(email_router)
 
 
 @app.get("/")

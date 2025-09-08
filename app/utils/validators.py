@@ -1,5 +1,6 @@
 import re
 from typing import Optional
+from email_validator import validate_email as email_validator, EmailNotValidError
 
 
 class PhoneValidator:
@@ -44,3 +45,25 @@ def validate_sms_text(text: str) -> str:
         raise ValueError("SMS text exceeds maximum length of 1600 characters")
 
     return cleaned_text
+
+
+class EmailValidator:
+    """Centralized email validation utility"""
+
+    @staticmethod
+    def validate_email(email: str, field_name: str = "email address") -> str:
+        """Validate email address, raise ValueError if invalid"""
+        try:
+            validated_email = email_validator(email)
+            return validated_email.email
+        except EmailNotValidError as e:
+            raise ValueError(f"Invalid {field_name}: {str(e)}")
+
+    @staticmethod
+    def is_valid_email(email: str) -> bool:
+        """Check if email address is valid"""
+        try:
+            email_validator(email)
+            return True
+        except EmailNotValidError:
+            return False

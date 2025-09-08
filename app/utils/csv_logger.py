@@ -19,6 +19,9 @@ class SimpleCSVLogger:
         if log_type == "sms":
             self.log_file = os.path.join(self.logs_dir, settings.sms_log_file)
             self.columns = ["timestamp", "to", "from_number", "text", "recId", "status", "sent_at"]
+        elif log_type == "email":
+            self.log_file = os.path.join(self.logs_dir, settings.email_log_file)
+            self.columns = ["timestamp", "to", "from_email", "subject", "message_id", "status", "sent_at"]
         else:
             raise ValueError(f"Invalid log type: {log_type}")
 
@@ -37,6 +40,17 @@ class SimpleCSVLogger:
         sent_at = datetime.now().isoformat()
 
         log_entry = [timestamp, to, from_number, text, rec_id or "", status, sent_at]
+
+        with open(self.log_file, 'a', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(log_entry)
+
+    def log_email(self, to: str, from_email: str, subject: str, message_id: Optional[str], status: str):
+        """Log email sending activity"""
+        timestamp = datetime.now().isoformat()
+        sent_at = datetime.now().isoformat()
+
+        log_entry = [timestamp, to, from_email, subject, message_id or "", status, sent_at]
 
         with open(self.log_file, 'a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
@@ -115,11 +129,13 @@ class SimpleCSVLogger:
 
 # Global logger instances
 sms_logger = SimpleCSVLogger("sms")
+email_logger = SimpleCSVLogger("email")
 
 
 def cleanup_all_logs():
-    """Cleanup old logs for SMS"""
+    """Cleanup old logs for SMS and Email"""
     sms_logger.cleanup_old_logs()
+    email_logger.cleanup_old_logs()
 
 
 if __name__ == "__main__":
