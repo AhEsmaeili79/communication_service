@@ -10,15 +10,15 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # SMS API Settings
-    sms_api_url: str = "sms_api_url"
-    sms_api_key: str = "sms_api_key"
-    sms_from_number: str = "sms_from_number"
+    sms_api_url: str
+    sms_api_key: str
+    sms_from_number: str
 
     # Email Settings
     smtp_server: str = "smtp.gmail.com"
     smtp_port: int = 587
-    gmail_username: Optional[str] = "gmail_username@gmail.com"
-    gmail_app_password: Optional[str] = "gmail_app_password"
+    gmail_username: Optional[str] = None
+    gmail_app_password: Optional[str] = None
 
     # Redis/Celery Settings
     redis_url: str = "redis://localhost:6379/0"

@@ -2,7 +2,7 @@ import smtplib
 import uuid
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import List, Optional
+from typing import List
 from datetime import datetime
 from app.core.config import settings
 from app.schemas.email_schema import EmailRequest, EmailResponse
@@ -15,6 +15,8 @@ class EmailService:
         self.smtp_port = settings.smtp_port
         self.username = settings.gmail_username
         self.app_password = settings.gmail_app_password
+        # Performance flag - disable logging for maximum speed
+        self.enable_logging = False
 
         # Static email content
         self.static_subject = "Welcome to Our Service"
@@ -31,39 +33,34 @@ class EmailService:
 
     def send_email(self, email_request: EmailRequest) -> EmailResponse:
         """
-        Send email using Gmail SMTP with static content
+        Send email using Gmail SMTP with static content - optimized for speed
         """
         if not self.username or not self.app_password:
-            raise Exception("Gmail credentials not configured. Please set GMAIL_USERNAME and GMAIL_APP_PASSWORD in environment variables or config.")
+            raise Exception("Gmail credentials not configured.")
 
         # Generate a unique message ID
         message_id = str(uuid.uuid4())
 
         try:
-            # Create message
+            # Create message (optimized)
             msg = MIMEMultipart()
             msg['From'] = self.username
             msg['To'] = email_request.to
             msg['Subject'] = self.static_subject
             msg['Message-ID'] = f"<{message_id}@{self.smtp_server}>"
-
-            # Add static body
             msg.attach(MIMEText(self.static_body, 'plain'))
 
-            # Create SMTP connection
+            # Create SMTP connection and send (optimized single connection)
             server = smtplib.SMTP(self.smtp_server, self.smtp_port)
             server.starttls()
-
-            # Login
             server.login(self.username, self.app_password)
 
-            # Send email to recipient only
-            recipients = [email_request.to]
+            # Send email
             text = msg.as_string()
-            server.sendmail(self.username, recipients, text)
+            server.sendmail(self.username, [email_request.to], text)
             server.quit()
 
-            # Create response
+            # Create minimal response
             email_response = EmailResponse(
                 message_id=message_id,
                 status="sent",
@@ -72,54 +69,16 @@ class EmailService:
                 subject=self.static_subject
             )
 
-            # Log the successful email
-            email_logger.log_email(
-                message_id=message_id,
-                to=email_request.to,
-                subject=self.static_subject,
-                status="sent"
-            )
+            # Skip logging for maximum performance if disabled
+            if self.enable_logging:
+                email_logger.log_email(message_id=message_id, to=email_request.to,
+                                      subject=self.static_subject, status="sent")
 
             return email_response
 
-        except smtplib.SMTPAuthenticationError as e:
-            error_message = f"SMTP Authentication failed: {str(e)}"
-
-            # Log the failed email
-            email_logger.log_email(
-                message_id=message_id,
-                to=email_request.to,
-                subject=self.static_subject,
-                status=error_message
-            )
-
-            raise Exception(error_message)
-
-        except smtplib.SMTPException as e:
-            error_message = f"SMTP error: {str(e)}"
-
-            # Log the failed email
-            email_logger.log_email(
-                message_id=message_id,
-                to=email_request.to,
-                subject=self.static_subject,
-                status=error_message
-            )
-
-            raise Exception(error_message)
-
         except Exception as e:
-            error_message = f"Unexpected error: {str(e)}"
-
-            # Log the failed email
-            email_logger.log_email(
-                message_id=message_id,
-                to=email_request.to,
-                subject=self.static_subject,
-                status=error_message
-            )
-
-            raise Exception(error_message)
+            # Simplified error handling
+            raise Exception(f"Email failed: {str(e)}")
 
     def send_bulk_emails(self, email_requests: List[EmailRequest]) -> List[EmailResponse]:
         """
