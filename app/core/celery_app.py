@@ -18,9 +18,6 @@ celery_app.conf.update(
     enable_utc=True,
     task_routes={
         "app.core.tasks.send_sms_task": {"queue": "sms"},
-        "app.core.tasks.send_email_task": {"queue": "email"},
-        "app.core.tasks.send_bulk_sms_task": {"queue": "sms"},
-        "app.core.tasks.send_bulk_email_task": {"queue": "email"},
         "app.core.tasks.cleanup_logs_task": {"queue": "maintenance"},
     },
     task_default_queue="default",

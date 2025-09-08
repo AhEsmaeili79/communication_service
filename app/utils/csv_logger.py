@@ -1,11 +1,17 @@
 import os
 import csv
+import asyncio
+import aiofiles
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
+from collections import deque
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 from app.core.config import settings
 
 
-class CSVLogger:
+class AsyncCSVLogger:
     def __init__(self, log_type: str):
         self.log_type = log_type
         self.logs_dir = settings.logs_directory
@@ -17,14 +23,23 @@ class CSVLogger:
         if log_type == "sms":
             self.log_file = os.path.join(self.logs_dir, settings.sms_log_file)
             self.columns = ["timestamp", "to", "from_number", "text", "recId", "status", "sent_at"]
-        elif log_type == "email":
-            self.log_file = os.path.join(self.logs_dir, settings.email_log_file)
-            self.columns = ["timestamp", "message_id", "to", "subject", "status", "sent_at"]
         else:
             raise ValueError(f"Invalid log type: {log_type}")
 
         # Create file if it doesn't exist
         self._ensure_log_file_exists()
+
+        # Buffer for batch writing
+        self.buffer = deque()
+        self.buffer_lock = threading.Lock()
+        self.buffer_size = 100  # Write to disk when buffer reaches this size
+        self.flush_interval = 30  # Flush buffer every 30 seconds
+        
+        # Thread pool for file operations
+        self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="csv_logger")
+        
+        # Start background flush task
+        self._start_background_flush()
 
     def _ensure_log_file_exists(self):
         """Ensure the log file exists with headers"""
@@ -32,90 +47,77 @@ class CSVLogger:
             with open(self.log_file, 'w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
                 writer.writerow(self.columns)
-        else:
-            # Check if we need to migrate from old format
-            self._migrate_old_format_if_needed()
 
-    def _migrate_old_format_if_needed(self):
-        """Migrate from old format (with cc/bcc) to new format (without cc/bcc)"""
-        if self.log_type != "email":
-            return
+    def _start_background_flush(self):
+        """Start background task to flush buffer periodically"""
+        def flush_worker():
+            while True:
+                asyncio.run(self._flush_buffer())
+                threading.Event().wait(self.flush_interval)
+        
+        flush_thread = threading.Thread(target=flush_worker, daemon=True)
+        flush_thread.start()
 
-        try:
-            with open(self.log_file, 'r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                lines = list(reader)
-
-            if not lines:
+    async def _flush_buffer(self):
+        """Flush the buffer to disk"""
+        with self.buffer_lock:
+            if not self.buffer:
                 return
+            
+            # Get all items from buffer
+            items_to_write = list(self.buffer)
+            self.buffer.clear()
+        
+        if items_to_write:
+            await self._write_to_file_async(items_to_write)
 
-            # Check if first line has old format with cc/bcc
-            header = lines[0]
-            if len(header) >= 8 and 'cc' in header and 'bcc' in header:
-                print(f"Migrating {self.log_file} from old format to new format...")
-
-                # Create backup
-                backup_file = self.log_file + '.backup'
-                with open(backup_file, 'w', newline='', encoding='utf-8') as file:
-                    writer = csv.writer(file)
-                    writer.writerows(lines)
-
-                # Write new format
-                with open(self.log_file, 'w', newline='', encoding='utf-8') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(self.columns)  # New headers
-
-                    # Migrate existing data (skip header, only take useful columns)
-                    for line in lines[1:]:
-                        if len(line) >= 8 and line[0]:  # Old format had 8 columns and skip empty lines
-                            # Extract useful data: timestamp, message_id, to, subject, status, sent_at
-                            new_line = [line[0], line[1], line[2], line[3], line[6], line[7]]
-                            writer.writerow(new_line)
-
-                print(f"Migration completed. Backup saved as {backup_file}")
-
+    async def _write_to_file_async(self, items: List[List[str]]):
+        """Write items to file asynchronously"""
+        try:
+            async with aiofiles.open(self.log_file, 'a', newline='', encoding='utf-8') as file:
+                for item in items:
+                    await file.write(','.join(f'"{str(field)}"' for field in item) + '\n')
         except Exception as e:
-            print(f"Error migrating log format: {e}")
+            print(f"Error writing to log file: {e}")
 
     def log_sms(self, to: str, from_number: str, text: str, rec_id: Optional[int], status: str):
-        """Log SMS sending activity"""
-        if self.log_type != "sms":
-            raise ValueError("This logger is not configured for SMS logging")
-
+        """Log SMS sending activity (synchronous interface for compatibility)"""
         timestamp = datetime.now().isoformat()
         sent_at = datetime.now().isoformat()
+        
+        log_entry = [timestamp, to, from_number, text, rec_id or "", status, sent_at]
+        
+        with self.buffer_lock:
+            self.buffer.append(log_entry)
+            
+            # Flush if buffer is full
+            if len(self.buffer) >= self.buffer_size:
+                asyncio.create_task(self._flush_buffer())
 
-        with open(self.log_file, 'a', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow([timestamp, to, from_number, text, rec_id or "", status, sent_at])
-
-    def log_email(self, message_id: str, to: str, subject: str, status: str = "sent"):
-        """Log email sending activity"""
-        if self.log_type != "email":
-            raise ValueError("This logger is not configured for email logging")
-
+    async def log_sms_async(self, to: str, from_number: str, text: str, rec_id: Optional[int], status: str):
+        """Log SMS sending activity asynchronously"""
         timestamp = datetime.now().isoformat()
         sent_at = datetime.now().isoformat()
+        
+        log_entry = [timestamp, to, from_number, text, rec_id or "", status, sent_at]
+        
+        with self.buffer_lock:
+            self.buffer.append(log_entry)
+            
+            # Flush if buffer is full
+            if len(self.buffer) >= self.buffer_size:
+                await self._flush_buffer()
 
-        with open(self.log_file, 'a', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow([timestamp, message_id, to, subject, status, sent_at])
-
-    def clean_logs_format(self):
-        """Manually clean and migrate log format"""
-        if self.log_type == "email":
-            self._migrate_old_format_if_needed()
-
-    def cleanup_old_logs(self):
-        """Remove logs older than retention period"""
+    async def cleanup_old_logs_async(self):
+        """Remove logs older than retention period asynchronously"""
         if not os.path.exists(self.log_file):
             return
 
         try:
             # Read all lines from the CSV file
-            with open(self.log_file, 'r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                lines = list(reader)
+            async with aiofiles.open(self.log_file, 'r', encoding='utf-8') as file:
+                content = await file.read()
+                lines = content.strip().split('\n')
 
             if len(lines) <= 1:  # Only header or empty
                 return
@@ -128,20 +130,21 @@ class CSVLogger:
             filtered_lines = [header]
 
             for line in lines[1:]:
-                if len(line) >= 1:
+                if line.strip():
                     try:
                         # Parse timestamp from first column
-                        record_timestamp = datetime.fromisoformat(line[0])
-                        if record_timestamp >= cutoff_date:
-                            filtered_lines.append(line)
+                        fields = line.split(',')
+                        if fields and fields[0].strip('"'):
+                            record_timestamp = datetime.fromisoformat(fields[0].strip('"'))
+                            if record_timestamp >= cutoff_date:
+                                filtered_lines.append(line)
                     except (ValueError, IndexError):
                         # Keep malformed lines or lines without timestamp
                         filtered_lines.append(line)
 
             # Write back filtered records
-            with open(self.log_file, 'w', newline='', encoding='utf-8') as file:
-                writer = csv.writer(file)
-                writer.writerows(filtered_lines)
+            async with aiofiles.open(self.log_file, 'w', encoding='utf-8') as file:
+                await file.write('\n'.join(filtered_lines))
 
             removed_count = len(lines) - len(filtered_lines)
             if removed_count > 0:
@@ -150,15 +153,26 @@ class CSVLogger:
         except Exception as e:
             print(f"Error cleaning up {self.log_type} logs: {e}")
 
-    def get_logs(self, days: int = None) -> List[Dict[str, Any]]:
-        """Get logs from the last N days as list of dictionaries"""
+    def cleanup_old_logs(self):
+        """Remove logs older than retention period (synchronous interface)"""
+        asyncio.run(self.cleanup_old_logs_async())
+
+    async def get_logs_async(self, days: int = None) -> List[Dict[str, Any]]:
+        """Get logs from the last N days as list of dictionaries asynchronously"""
         if not os.path.exists(self.log_file):
             return []
 
         try:
-            with open(self.log_file, 'r', newline='', encoding='utf-8') as file:
-                reader = csv.DictReader(file)
-                logs = list(reader)
+            async with aiofiles.open(self.log_file, 'r', encoding='utf-8') as file:
+                content = await file.read()
+                lines = content.strip().split('\n')
+
+            if not lines or len(lines) <= 1:
+                return []
+
+            # Parse CSV
+            reader = csv.DictReader(lines)
+            logs = list(reader)
 
             if not logs:
                 return []
@@ -170,7 +184,7 @@ class CSVLogger:
 
                 for log in logs:
                     try:
-                        record_timestamp = datetime.fromisoformat(log.get('timestamp', ''))
+                        record_timestamp = datetime.fromisoformat(log.get('timestamp', '').strip('"'))
                         if record_timestamp >= cutoff_date:
                             filtered_logs.append(log)
                     except (ValueError, KeyError):
@@ -185,22 +199,38 @@ class CSVLogger:
             print(f"Error reading {self.log_type} logs: {e}")
             return []
 
+    def get_logs(self, days: int = None) -> List[Dict[str, Any]]:
+        """Get logs from the last N days as list of dictionaries (synchronous interface)"""
+        return asyncio.run(self.get_logs_async(days))
+
+    async def flush(self):
+        """Manually flush the buffer"""
+        await self._flush_buffer()
+
+    def __del__(self):
+        """Cleanup on destruction"""
+        if hasattr(self, 'executor'):
+            self.executor.shutdown(wait=True)
+
 
 # Global logger instances
-sms_logger = CSVLogger("sms")
-email_logger = CSVLogger("email")
+sms_logger = AsyncCSVLogger("sms")
 
 
 def cleanup_all_logs():
-    """Cleanup old logs for both SMS and email"""
+    """Cleanup old logs for SMS (synchronous interface)"""
     sms_logger.cleanup_old_logs()
-    email_logger.cleanup_old_logs()
+
+
+async def cleanup_all_logs_async():
+    """Cleanup old logs for SMS (asynchronous interface)"""
+    await sms_logger.cleanup_old_logs_async()
 
 
 def clean_all_log_formats():
     """Clean and migrate all log formats"""
-    email_logger.clean_logs_format()
-    sms_logger.clean_logs_format()
+    # This function can be extended for log format migrations
+    pass
 
 
 if __name__ == "__main__":

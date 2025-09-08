@@ -14,12 +14,6 @@ class Settings(BaseSettings):
     sms_api_key: str
     sms_from_number: str
 
-    # Email Settings
-    smtp_server: str = "smtp.gmail.com"
-    smtp_port: int = 587
-    gmail_username: Optional[str] = None
-    gmail_app_password: Optional[str] = None
-
     # Redis/Celery Settings
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/0"
@@ -28,8 +22,20 @@ class Settings(BaseSettings):
     # Logging Settings
     logs_directory: str = "app/logs"
     sms_log_file: str = "sms_logs.csv"
-    email_log_file: str = "email_logs.csv"
     log_retention_days: int = 7
+    log_level: str = "INFO"
+
+    # SMS Service Performance Settings
+    sms_rate_limit: int = 10  # Max concurrent SMS requests
+    sms_timeout: float = 30.0  # Request timeout in seconds
+    sms_retry_attempts: int = 3  # Number of retry attempts
+    sms_circuit_breaker_threshold: int = 5  # Failures before circuit breaker opens
+    sms_circuit_breaker_timeout: int = 60  # Circuit breaker timeout in seconds
+
+    # HTTP Client Settings
+    http_max_connections: int = 100
+    http_max_keepalive_connections: int = 20
+    http_connect_timeout: float = 10.0
 
     class Config:
         env_file = ".env"

@@ -1,20 +1,22 @@
 from fastapi import APIRouter, HTTPException
+import asyncio
+
 from app.schemas.sms_schema import SMSRequest, SMSResponse
-from app.services.sms.sms_service import sms_service
+from app.services.sms.sms_service import sms_service, SMSServiceError
 
 router = APIRouter(prefix="/sms", tags=["SMS"])
 
 
 @router.post("/send", response_model=SMSResponse)
-def send_sms(
-    sms_request: SMSRequest
-):
+async def send_sms(sms_request: SMSRequest):
     """
-    Send SMS synchronously
+    Send SMS with optimized performance
     """
     try:
-        result = sms_service.send_sms(sms_request)
+        result = await sms_service.send_sms(sms_request)
         return result
+    except SMSServiceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send SMS: {str(e)}")
 
