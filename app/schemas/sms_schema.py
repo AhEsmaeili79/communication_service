@@ -41,12 +41,8 @@ class SMSRequest(BaseModel):
 
 
 class SMSResponse(BaseModel):
-    recId: Optional[int] = None
-    status: str
-    sent_at: datetime
     to: str
-    text: str
-    from_number: str
+    status: str
 
     model_config = {
         "from_attributes": True

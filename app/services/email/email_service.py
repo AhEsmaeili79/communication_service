@@ -146,12 +146,8 @@ The Communication Service Team"""
 
                 # Create response
                 email_response = EmailResponse(
-                    message_id=message_id,
-                    status="sent",
-                    sent_at=datetime.now(),
                     to=email_request.to,
-                    subject=subject,
-                    from_email=self.default_from
+                    status="sent"
                 )
 
                 # Log success

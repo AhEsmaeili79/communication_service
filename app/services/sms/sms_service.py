@@ -126,12 +126,8 @@ class SMSService:
 
                     # Create response
                     sms_response = SMSResponse(
-                        recId=sms_api_response.recId or 0,
-                        status=sms_api_response.status,
-                        sent_at=datetime.now(),
                         to=sms_request.to,
-                        text=sms_request.text,
-                        from_number=payload["from"]
+                        status=sms_api_response.status
                     )
 
                     # Log success

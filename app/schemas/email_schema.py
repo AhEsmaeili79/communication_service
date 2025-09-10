@@ -16,12 +16,8 @@ class EmailRequest(BaseModel):
 
 
 class EmailResponse(BaseModel):
-    message_id: Optional[str] = None
-    status: str
-    sent_at: datetime
     to: str
-    subject: str
-    from_email: str
+    status: str
 
     model_config = {
         "from_attributes": True
