@@ -17,13 +17,28 @@ class Settings(BaseSettings):
     # Email SMTP Settings
     smtp_server: str = "smtp.gmail.com"
     smtp_port: int = 587
-    gmail_username: str = "kharjam.com@gmail.com"
-    gmail_app_password: str = "ndybfirknivnggxl"
+    gmail_username: str 
+    gmail_app_password: str
 
     # Redis/Celery Settings
-    redis_url: str = "redis://localhost:6379/0"
-    celery_broker_url: str = "redis://localhost:6379/0"
-    celery_result_backend: str = "redis://localhost:6379/0"
+    redis_host: str 
+    redis_port: int 
+    redis_password: Optional[str] = None
+    redis_db: int = 0
+
+    # Construct Redis URLs dynamically
+    @property
+    def redis_url(self) -> str:
+        auth = f":{self.redis_password}@" if self.redis_password else ""
+        return f"redis://{auth}{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+    @property
+    def celery_broker_url(self) -> str:
+        return self.redis_url
+
+    @property
+    def celery_result_backend(self) -> str:
+        return self.redis_url
 
     # Logging Settings
     logs_directory: str = "app/logs"

@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Celery worker service
+  celery-worker:
+    build: .
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=2
+    volumes:
+      - ./app/logs:/communication_service/app/logs
+      - ./.env:/communication_service/.env
+    environment:
+      - PYTHONPATH=/communication_service
+    restart: unless-stopped
+    networks:
+      - redis_network
+
+  # FastAPI application service
+  communication-service:
+    build: .
+    ports:
+      - "8002:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./app/logs:/communication_service/app/logs
+      - ./.env:/communication_service/.env
+    environment:
+      - PYTHONPATH=/communication_service
+    restart: unless-stopped
+    networks:
+      - redis_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  redis_network:
+    name: redis_network
+    external: true
