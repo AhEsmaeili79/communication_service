@@ -11,6 +11,8 @@ class PhoneValidator:
         r'^\+98[0-9]{10}$',      # +98xxxxxxxxxx (Iran international)
         r'^0098[0-9]{10}$',      # 0098xxxxxxxxxx (Iran international with 00)
         r'^98[0-9]{10}$',        # 98xxxxxxxxxx (Iran without + or 00)
+        r'^98[0-9]{11}$',        # 98xxxxxxxxxxx (Iran without + or 00 - 12 digits total)
+        r'^09[0-9]{9}$',         # 09xxxxxxxxx (Iran local - 11 digits total)
         r'^09[0-9]{10}$',        # 09xxxxxxxxxx (Iran local - 12 digits total)
         r'^5000[0-9]{10}$',     # 5000xxxxxxxxxx (Iran SMS sender)
         r'^\+?[1-9]\d{1,14}$'    # General international format
@@ -30,7 +32,7 @@ class PhoneValidator:
     @staticmethod
     def convert_phone_for_melipayamak(phone: str) -> str:
         """
-        Convert phone number from 98xxxxxxxxxx format to 09xxxxxxxxx for Melipayamak SMS service
+        Convert phone number from various formats to 09xxxxxxxxx for Melipayamak SMS service
         
         Args:
             phone: Phone number in various formats
@@ -45,6 +47,11 @@ class PhoneValidator:
             # Remove 98 prefix and add 09 prefix
             return '09' + clean_phone[2:]
         
+        # For 98xxxxxxxxxxx format (11 digits after 98), return as is
+        # This format works directly with Melipayamak API
+        if re.match(r'^98[0-9]{11}$', clean_phone):
+            return clean_phone
+        
         # Convert +98xxxxxxxxxx to 09xxxxxxxxx
         if re.match(r'^\+98[0-9]{10}$', clean_phone):
             # Remove +98 prefix and add 09 prefix
@@ -58,6 +65,10 @@ class PhoneValidator:
         # If already in 09xxxxxxxxx format, return as is
         if re.match(r'^09[0-9]{9}$', clean_phone):
             return clean_phone
+        
+        # Handle 09xxxxxxxxxx format (12 digits total) - remove last digit
+        if re.match(r'^09[0-9]{10}$', clean_phone):
+            return clean_phone[:-1]
         
         # For other formats, return as is (let validation handle it)
         return clean_phone
