@@ -10,7 +10,8 @@ services:
       - PYTHONPATH=/communication_service
     restart: unless-stopped
     networks:
-      - redis_network
+      - rabbitmq-network
+      - redis-network
 
   # FastAPI application service
   communication-service:
@@ -26,7 +27,8 @@ services:
       - PYTHONPATH=/communication_service
     restart: unless-stopped
     networks:
-      - redis_network
+      - rabbitmq-network
+      - redis-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -35,6 +37,9 @@ services:
       start_period: 40s
 
 networks:
-  redis_network:
-    name: redis_network
+  rabbitmq-network:
     external: true
+    name: rabbitmq_rabbitmq-network
+  redis-network:
+    external: true
+    name: redis_network

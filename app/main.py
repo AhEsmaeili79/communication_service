@@ -1,23 +1,45 @@
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import logging
 
 from app.core.config import settings
 from app.api.v1.routes.sms import router as sms_router
 from app.api.v1.routes.email import router as email_router
 from app.core.tasks import cleanup_logs_task
+from app.services.otp.otp_consumer import otp_consumer_service
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print(f"Starting {settings.app_name} v{settings.app_version}")
-    print("FastAPI server started - scheduler available via manual triggers")
+    logger.info(f"Starting {settings.app_name} v{settings.app_version}")
+    logger.info("FastAPI server started - scheduler available via manual triggers")
+    
+    # Start OTP consumer service
+    try:
+        logger.info("Starting OTP consumer service...")
+        otp_consumer_service.start_consuming()
+        logger.info("OTP consumer service started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start OTP consumer service: {e}")
+        logger.warning("Application will continue without OTP consumer functionality")
+    
     yield
+    
     # Shutdown
-    print(f"Shutting down {settings.app_name}")
+    logger.info(f"Shutting down {settings.app_name}")
+    try:
+        otp_consumer_service.stop_consuming()
+        logger.info("OTP consumer service stopped")
+    except Exception as e:
+        logger.error(f"Error stopping OTP consumer service: {e}")
 
 # Create FastAPI app
 app = FastAPI(
@@ -59,10 +81,13 @@ async def health_check():
     """
     Health check endpoint
     """
+    otp_consumer_healthy = otp_consumer_service.is_healthy()
+    
     return {
-        "status": "healthy",
+        "status": "healthy" if otp_consumer_healthy else "degraded",
         "service": settings.app_name,
-        "version": settings.app_version
+        "version": settings.app_version,
+        "otp_consumer": "healthy" if otp_consumer_healthy else "unhealthy"
     }
 
 

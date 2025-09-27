@@ -69,11 +69,30 @@ class Settings(BaseSettings):
     http_connect_timeout: float = 10.0
 
     # CORS Settings
-    cors_origins: str = "http://localhost:3000,http://localhost:8080"
+    cors_origins: str = "http://localhost:3000,http://localhost:8080,http://localhost:8002"
+
+    # RabbitMQ Settings
+    rabbitmq_host: str
+    rabbitmq_port: int
+    rabbitmq_username: str
+    rabbitmq_password: str
+    rabbitmq_vhost: str = "/"
+    rabbitmq_connection_attempts: int = 3
+    rabbitmq_retry_delay: float = 2.0
+    rabbitmq_heartbeat: int = 600
+    rabbitmq_message_ttl: int = 300000
+
+    # RabbitMQ Queue Settings
+    otp_exchange: str = "user.otp.exchange"
+    email_queue: str = "user.otp.email.queue"
+    sms_queue: str = "user.otp.sms.queue"
+    email_routing_key: str = "otp.email.send"
+    sms_routing_key: str = "otp.sms.send"
 
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # Allow extra fields from environment
 
 
 settings = Settings()

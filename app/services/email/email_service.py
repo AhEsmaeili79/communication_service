@@ -117,7 +117,7 @@ The Communication Service Team"""
         # Check circuit breaker
         if self.circuit_breaker.is_open():
             error_msg = "Email service is temporarily unavailable due to high failure rate"
-            logger.error("Circuit breaker open", error=error_msg)
+            logger.error(f"Circuit breaker open: {error_msg}")
             raise EmailServiceError(error_msg)
 
         # Apply rate limiting
@@ -134,7 +134,7 @@ If you have any questions or need assistance, please don't hesitate to contact u
 Best regards,
 The Communication Service Team"""
 
-                logger.info("Sending email", to=email_request.to, subject=subject)
+                logger.info(f"Sending email to {email_request.to} with subject {subject}")
 
                 # Run SMTP operation in thread pool to avoid blocking
                 loop = asyncio.get_event_loop()
@@ -162,15 +162,13 @@ The Communication Service Team"""
                 # Record success
                 self.circuit_breaker.record_success()
 
-                logger.info("Email sent successfully",
-                          message_id=message_id,
-                          to=email_request.to)
+                logger.info(f"Email sent successfully with message_id {message_id} to {email_request.to}")
 
                 return email_response
 
             except Exception as e:
                 error_message = f"Email sending failed: {str(e)}"
-                logger.error("Email sending error", error=str(e))
+                logger.error(f"Email sending error: {str(e)}")
 
                 # Handle failure
                 self.circuit_breaker.record_failure()

@@ -103,7 +103,7 @@ class SMSService:
         # Check circuit breaker
         if self.circuit_breaker.is_open():
             error_msg = "SMS service is temporarily unavailable due to high failure rate"
-            logger.error("Circuit breaker open", error=error_msg)
+            logger.error(f"Circuit breaker open: {error_msg}")
             raise SMSServiceError(error_msg)
 
         # Prepare payload
@@ -116,7 +116,7 @@ class SMSService:
         # Apply rate limiting
         async with self.rate_limit_semaphore:
             try:
-                logger.info("Sending SMS", to=sms_request.to, from_number=payload["from"])
+                logger.info(f"Sending SMS to {sms_request.to} from {payload['from']}")
 
                 response = await self._send_http_request(payload)
 
@@ -142,19 +142,17 @@ class SMSService:
                     # Record success
                     self.circuit_breaker.record_success()
 
-                    logger.info("SMS sent successfully",
-                              rec_id=sms_api_response.recId,
-                              status=sms_api_response.status)
+                    logger.info(f"SMS sent successfully with rec_id {sms_api_response.recId} and status {sms_api_response.status}")
 
                     return sms_response
 
                 else:
                     error_message = f"API request failed: {response.status_code} - {response.text}"
-                    logger.error("SMS API error", status_code=response.status_code)
+                    logger.error(f"SMS API error with status_code {response.status_code}")
 
             except Exception as e:
                 error_message = f"SMS sending failed: {str(e)}"
-                logger.error("SMS sending error", error=str(e))
+                logger.error(f"SMS sending error: {str(e)}")
 
             # Handle failure
             self.circuit_breaker.record_failure()
