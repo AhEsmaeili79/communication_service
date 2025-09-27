@@ -21,10 +21,13 @@ class Settings(BaseSettings):
     gmail_app_password: str
 
     # Redis/Celery Settings
-    redis_host: str 
-    redis_port: int 
+    redis_host: str
+    redis_port: int
     redis_password: Optional[str] = None
     redis_db: int = 0
+    redis_max_connections: int = 20
+    redis_socket_timeout: int = 5
+    redis_socket_connect_timeout: int = 5
 
     # Construct Redis URLs dynamically
     @property
