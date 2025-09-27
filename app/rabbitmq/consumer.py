@@ -112,32 +112,19 @@ def create_otp_message_callback(handler_func: Callable) -> Callable:
             # Parse message
             message_data = json.loads(body.decode('utf-8'))
             logger.info(f"Received OTP message: {message_data}")
-            
-            # Check retry count to prevent infinite loops
-            retry_count = method.delivery_tag  # Using delivery_tag as a simple retry counter
-            max_retries = 3
-            
-            if retry_count > max_retries:
-                logger.error(f"Message exceeded max retries ({max_retries}), discarding")
-                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-                return
-            
+
             # Process the message
             success = handler_func(message_data)
-            
+
             if success:
                 # Acknowledge message
                 ch.basic_ack(delivery_tag=method.delivery_tag)
                 logger.info("OTP message processed successfully")
             else:
-                # Reject message and requeue (with retry limit)
-                if retry_count < max_retries:
-                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
-                    logger.warning(f"OTP message processing failed, requeuing (attempt {retry_count + 1}/{max_retries})")
-                else:
-                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-                    logger.error("OTP message processing failed after max retries, discarding")
-                
+                # Reject message without requeueing to prevent infinite loops
+                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+                logger.error("OTP message processing failed, message discarded")
+
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse message JSON: {e}")
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)

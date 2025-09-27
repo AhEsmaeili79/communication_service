@@ -41,12 +41,113 @@ class OTPHandler:
                 return False
             
             logger.info(f"Processing email OTP for {identifier}: {otp_code}")
-            
+
             # Create email request with OTP content
-            email_request = EmailRequest(to=identifier)
-            
+            subject = f"Verification Code: {otp_code}"
+
+            # Create modern, concise HTML email template
+            body = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #374151;
+            max-width: 480px;
+            margin: 0 auto;
+            background: #f9fafb;
+            padding: 20px;
+        }}
+        .card {{
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }}
+        .logo {{
+            font-size: 28px;
+            margin-bottom: 16px;
+        }}
+        .title {{
+            font-size: 20px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 8px;
+        }}
+        .subtitle {{
+            color: #6b7280;
+            margin-bottom: 24px;
+        }}
+        .otp-code {{
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            font-size: 36px;
+            font-weight: 700;
+            font-family: 'Monaco', 'Menlo', monospace;
+            letter-spacing: 8px;
+            padding: 20px 16px;
+            border-radius: 12px;
+            margin: 24px 0;
+            display: inline-block;
+            box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.3);
+        }}
+        .timer {{
+            background: #fef3c7;
+            color: #92400e;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            display: inline-block;
+            margin-bottom: 16px;
+        }}
+        .warning {{
+            background: #fef2f2;
+            color: #991b1b;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin: 20px 0;
+        }}
+        .footer {{
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e5e7eb;
+            color: #9ca3af;
+            font-size: 13px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="logo">🔐</div>
+        <h1 class="title">Verify Your Account</h1>
+        <p class="subtitle">Enter this code to complete your verification</p>
+
+        <div class="timer">⏰ Expires in 5 minutes</div>
+
+        <div class="otp-code">{otp_code}</div>
+
+        <div class="warning">
+            <strong>Don't share this code</strong> with anyone. Our team will never ask for it.
+        </div>
+
+        <div class="footer">
+            <p>If you didn't request this code, please ignore this email.</p>
+            <p>© 2025 Your Company</p>
+        </div>
+    </div>
+</body>
+</html>"""
+
+            email_request = EmailRequest(to=identifier, subject=subject, body=body)
+
             # Send email with OTP using asyncio.run for sync context
-            response = asyncio.run(self._send_otp_email(email_request, otp_code))
+            response = asyncio.run(self._send_otp_email(email_request))
             
             if response:
                 logger.info(f"Email OTP sent successfully to {identifier}")
@@ -98,30 +199,26 @@ class OTPHandler:
             logger.error(f"Error processing SMS OTP message: {e}")
             return False
     
-    async def _send_otp_email(self, email_request: EmailRequest, otp_code: str) -> bool:
+    async def _send_otp_email(self, email_request: EmailRequest) -> bool:
         """
         Send OTP email with custom content
-        
+
         Args:
-            email_request: Email request object
-            otp_code: OTP code to include in email
-        
+            email_request: Email request object with OTP content
+
         Returns:
             bool: True if sent successfully, False otherwise
         """
         try:
-            # For now, we'll use the existing email service
-            # In a real implementation, you might want to modify the email service
-            # to accept custom subject and body content
             response = await self.email_service.send_email(email_request)
-            
+
             if response and response.status == "sent":
-                logger.info(f"OTP email sent to {email_request.to} with code {otp_code}")
+                logger.info(f"OTP email sent to {email_request.to}")
                 return True
             else:
                 logger.error(f"Failed to send OTP email to {email_request.to}")
                 return False
-                
+
         except Exception as e:
             logger.error(f"Error sending OTP email: {e}")
             return False

@@ -81,9 +81,14 @@ class EmailService:
     )
     def _send_smtp_email_sync(self, email_request: EmailRequest) -> str:
         """Send email via SMTP with retry logic"""
-        # Predefined email content
-        subject = "Welcome to Our Service"
-        body = """Hello!
+        # Use custom subject/body if provided, otherwise use default welcome message
+        if email_request.subject and email_request.body:
+            subject = email_request.subject
+            body = email_request.body
+        else:
+            # Default welcome message
+            subject = "Welcome to Our Service"
+            body = """Hello!
 
 Thank you for your interest in our service. This is an automated message to confirm that our communication system is working properly.
 
@@ -91,23 +96,37 @@ If you have any questions or need assistance, please don't hesitate to contact u
 
 Best regards,
 The Communication Service Team"""
-        
+
         # Create message
-        msg = MIMEMultipart()
+        msg = MIMEMultipart('alternative')  # Use 'alternative' for plain text and HTML
         msg['From'] = self.default_from
         msg['To'] = email_request.to
         msg['Subject'] = subject
-        
-        # Add body to email
-        msg.attach(MIMEText(body, 'plain'))
-        
+
+        # Check if body contains HTML tags
+        is_html = '<html' in body.lower() or '<!doctype html' in body.lower()
+
+        # Add plain text version (always include for compatibility)
+        if is_html:
+            # Create a plain text version by stripping HTML tags
+            import re
+            plain_text_body = re.sub(r'<[^>]+>', '', body)
+            plain_text_body = re.sub(r'\s+', ' ', plain_text_body).strip()
+            msg.attach(MIMEText(plain_text_body, 'plain'))
+
+        # Add HTML version if content is HTML, otherwise use plain text
+        if is_html:
+            msg.attach(MIMEText(body, 'html'))
+        else:
+            msg.attach(MIMEText(body, 'plain'))
+
         # Connect to server and send email
         with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
             server.starttls()  # Enable security
             server.login(self.gmail_username, self.gmail_app_password)
             text = msg.as_string()
             server.sendmail(msg['From'], msg['To'], text)
-            
+
         return msg.get('Message-ID', 'unknown')
 
     async def send_email(self, email_request: EmailRequest) -> EmailResponse:
@@ -123,9 +142,14 @@ The Communication Service Team"""
         # Apply rate limiting
         async with self.rate_limit_semaphore:
             try:
-                # Predefined email content
-                subject = "Welcome to Our Service"
-                body = """Hello!
+                # Use custom subject/body if provided, otherwise use default welcome message
+                if email_request.subject and email_request.body:
+                    subject = email_request.subject
+                    body = email_request.body
+                else:
+                    # Default welcome message
+                    subject = "Welcome to Our Service"
+                    body = """Hello!
 
 Thank you for your interest in our service. This is an automated message to confirm that our communication system is working properly.
 
@@ -177,7 +201,7 @@ The Communication Service Team"""
                 email_logger.log_email(
                     to=email_request.to,
                     from_email=self.default_from,
-                    subject="Welcome to Our Service",
+                    subject=subject,
                     message_id=None,
                     status=error_message
                 )
