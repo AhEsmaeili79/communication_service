@@ -106,17 +106,20 @@ class SMSService:
             logger.error(f"Circuit breaker open: {error_msg}")
             raise SMSServiceError(error_msg)
 
+        # Convert phone number to Melipayamak format
+        converted_phone = PhoneValidator.convert_phone_for_melipayamak(sms_request.to)
+
         # Prepare payload
         payload = {
             "from": sms_request.from_number or self.default_from,
-            "to": sms_request.to,
+            "to": converted_phone,
             "text": sms_request.text
         }
 
         # Apply rate limiting
         async with self.rate_limit_semaphore:
             try:
-                logger.info(f"Sending SMS to {sms_request.to} from {payload['from']}")
+                logger.info(f"Sending SMS to {converted_phone} (original: {sms_request.to}) from {payload['from']}")
 
                 response = await self._send_http_request(payload)
 

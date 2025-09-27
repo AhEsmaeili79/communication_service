@@ -81,7 +81,8 @@ class OTPHandler:
                 response = asyncio.run(self.sms_service.send_sms(sms_request))
 
                 # Check if SMS was sent successfully
-                if response and response.status in ["ارسال موفق بود", "successful", "200"]:
+                # "ارسال موفق بود" = successfully sent, "successful" = English success, "200" = HTTP success
+                if response and response.status and "موفق" in response.status:
                     logger.info(f"SMS OTP sent successfully to {identifier}")
                     return True
                 else:

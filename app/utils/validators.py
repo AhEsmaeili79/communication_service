@@ -31,21 +31,14 @@ class PhoneValidator:
 
     @staticmethod
     def convert_phone_for_melipayamak(phone: str) -> str:
-        """
-        Convert phone number from various formats to 09xxxxxxxxx for Melipayamak SMS service
-        
-        Args:
-            phone: Phone number in various formats
-            
-        Returns:
-            str: Converted phone number in 09xxxxxxxxx format
-        """
+
         clean_phone = PhoneValidator.clean_phone_number(phone)
         
-        # Convert 98xxxxxxxxxx to 09xxxxxxxxx
+        # Convert 98xxxxxxxxxx to 09xxxxxxxxx (Iranian mobile: 98 + 10 digits = 12 chars total)
         if re.match(r'^98[0-9]{10}$', clean_phone):
-            # Remove 98 prefix and add 09 prefix
-            return '09' + clean_phone[2:]
+            # For Iranian mobile numbers: 989xxxxxxxxx should become 09xxxxxxxxx
+            # Remove 989 prefix and add 09 prefix: '09' + digits[3:]
+            return '09' + clean_phone[3:]
         
         # For 98xxxxxxxxxxx format (11 digits after 98), return as is
         # This format works directly with Melipayamak API
@@ -54,13 +47,13 @@ class PhoneValidator:
         
         # Convert +98xxxxxxxxxx to 09xxxxxxxxx
         if re.match(r'^\+98[0-9]{10}$', clean_phone):
-            # Remove +98 prefix and add 09 prefix
-            return '09' + clean_phone[3:]
+            # For +989xxxxxxxxx, remove +98 and add 09: '09' + digits[1:]
+            return '09' + clean_phone[4:]
         
         # Convert 0098xxxxxxxxxx to 09xxxxxxxxx
         if re.match(r'^0098[0-9]{10}$', clean_phone):
-            # Remove 0098 prefix and add 09 prefix
-            return '09' + clean_phone[4:]
+            # For 00989xxxxxxxxx, remove 0098 and add 09: '09' + digits[1:]
+            return '09' + clean_phone[5:]
         
         # If already in 09xxxxxxxxx format, return as is
         if re.match(r'^09[0-9]{9}$', clean_phone):
