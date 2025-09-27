@@ -10,7 +10,8 @@ class PhoneValidator:
     PATTERNS = [
         r'^\+98[0-9]{10}$',      # +98xxxxxxxxxx (Iran international)
         r'^0098[0-9]{10}$',      # 0098xxxxxxxxxx (Iran international with 00)
-        r'^09[0-9]{9}$',         # 09xxxxxxxxx (Iran local)
+        r'^98[0-9]{10}$',        # 98xxxxxxxxxx (Iran without + or 00)
+        r'^09[0-9]{10}$',        # 09xxxxxxxxxx (Iran local - 12 digits total)
         r'^5000[0-9]{10}$',     # 5000xxxxxxxxxx (Iran SMS sender)
         r'^\+?[1-9]\d{1,14}$'    # General international format
     ]
@@ -25,6 +26,41 @@ class PhoneValidator:
         """Validate phone number format"""
         clean_phone = PhoneValidator.clean_phone_number(phone)
         return any(re.match(pattern, clean_phone) for pattern in PhoneValidator.PATTERNS)
+
+    @staticmethod
+    def convert_phone_for_melipayamak(phone: str) -> str:
+        """
+        Convert phone number from 98xxxxxxxxxx format to 09xxxxxxxxx for Melipayamak SMS service
+        
+        Args:
+            phone: Phone number in various formats
+            
+        Returns:
+            str: Converted phone number in 09xxxxxxxxx format
+        """
+        clean_phone = PhoneValidator.clean_phone_number(phone)
+        
+        # Convert 98xxxxxxxxxx to 09xxxxxxxxx
+        if re.match(r'^98[0-9]{10}$', clean_phone):
+            # Remove 98 prefix and add 09 prefix
+            return '09' + clean_phone[2:]
+        
+        # Convert +98xxxxxxxxxx to 09xxxxxxxxx
+        if re.match(r'^\+98[0-9]{10}$', clean_phone):
+            # Remove +98 prefix and add 09 prefix
+            return '09' + clean_phone[3:]
+        
+        # Convert 0098xxxxxxxxxx to 09xxxxxxxxx
+        if re.match(r'^0098[0-9]{10}$', clean_phone):
+            # Remove 0098 prefix and add 09 prefix
+            return '09' + clean_phone[4:]
+        
+        # If already in 09xxxxxxxxx format, return as is
+        if re.match(r'^09[0-9]{9}$', clean_phone):
+            return clean_phone
+        
+        # For other formats, return as is (let validation handle it)
+        return clean_phone
 
     @staticmethod
     def validate_phone_number(phone: str, field_name: str = "phone number") -> str:

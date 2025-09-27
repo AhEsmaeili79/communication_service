@@ -7,6 +7,7 @@ from app.services.email.email_service import email_service
 from app.services.sms.sms_service import sms_service
 from app.schemas.email_schema import EmailRequest
 from app.schemas.sms_schema import SMSRequest
+from app.utils.validators import PhoneValidator
 
 logger = logging.getLogger(__name__)
 
@@ -81,20 +82,22 @@ class OTPHandler:
                 logger.error("Invalid SMS OTP message: missing identifier or otp_code")
                 return False
             
-            logger.info(f"Processing SMS OTP for {identifier}: {otp_code}")
+            # Convert phone number for Melipayamak SMS service
+            converted_identifier = PhoneValidator.convert_phone_for_melipayamak(identifier)
+            logger.info(f"Processing SMS OTP for {identifier} (converted to {converted_identifier}): {otp_code}")
             
-            # Create SMS request with OTP content
+            # Create SMS request with OTP content using converted phone number
             sms_text = f"Your OTP code is: {otp_code}. This code will expire in 5 minutes."
-            sms_request = SMSRequest(to=identifier, text=sms_text)
+            sms_request = SMSRequest(to=converted_identifier, text=sms_text)
             
             # Send SMS with OTP using asyncio.run for sync context
             response = asyncio.run(self.sms_service.send_sms(sms_request))
             
             if response and response.status == "sent":
-                logger.info(f"SMS OTP sent successfully to {identifier}")
+                logger.info(f"SMS OTP sent successfully to {converted_identifier} (original: {identifier})")
                 return True
             else:
-                logger.error(f"Failed to send SMS OTP to {identifier}")
+                logger.error(f"Failed to send SMS OTP to {converted_identifier} (original: {identifier})")
                 return False
                 
         except Exception as e:
