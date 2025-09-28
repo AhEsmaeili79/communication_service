@@ -1,6 +1,8 @@
 services:
   # Celery worker service
   celery-worker:
+    image: kharjam/celery-communication-service:v1.0.0
+    container_name: kharjam-communication-service-celery-worker
     build: .
     command: celery -A app.core.celery_app worker --loglevel=info --concurrency=2
     volumes:
@@ -15,6 +17,8 @@ services:
 
   # FastAPI application service
   communication-service:
+    image: kharjam/communication-service:v1.0.0
+    container_name: kharjam-communication-service
     build: .
     ports:
       - "8002:8000"
